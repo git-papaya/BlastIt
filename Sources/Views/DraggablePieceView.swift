@@ -4,48 +4,59 @@ public struct DraggablePieceView: View {
     public let piece: Piece
     public let index: Int
     @ObservedObject var gameState: GameState
-    public let boardFrame: CGRect
-    public let boardCellSize: CGFloat
+    public let gridGeometry: GridGeometry
+    public let slotSize: CGFloat
 
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging: Bool = false
     @State private var currentHoverCell: (row: Int, col: Int)? = nil
 
-    private let verticalTouchOffset: CGFloat = -75.0
-    private let trayCellSize: CGFloat = 22.0
+    private let verticalTouchOffset: CGFloat = -70.0
+
+    private var maxDimension: Int {
+        max(piece.width, piece.height)
+    }
+
+    private var trayCellSize: CGFloat {
+        let available = slotSize - 22.0
+        let spacingTotal = CGFloat(maxDimension - 1) * 2.0
+        let calculated = (available - spacingTotal) / CGFloat(maxDimension)
+        return max(10.0, min(20.0, calculated))
+    }
 
     public init(
         piece: Piece,
         index: Int,
         gameState: GameState,
-        boardFrame: CGRect,
-        boardCellSize: CGFloat
+        gridGeometry: GridGeometry,
+        slotSize: CGFloat
     ) {
         self.piece = piece
         self.index = index
         self.gameState = gameState
-        self.boardFrame = boardFrame
-        self.boardCellSize = boardCellSize
+        self.gridGeometry = gridGeometry
+        self.slotSize = slotSize
     }
 
     public var body: some View {
         GeometryReader { geo in
-            let activeCellSize = isDragging ? boardCellSize : trayCellSize
-            let pieceView = pieceShapeView(cellSize: activeCellSize)
+            let activeCellSize = isDragging ? (gridGeometry.cellSize > 0 ? gridGeometry.cellSize : 38.0) : trayCellSize
+            let activeSpacing: CGFloat = isDragging ? 4.0 : 2.0
+            let pieceContent = pieceShapeView(cellSize: activeCellSize, spacing: activeSpacing)
 
-            pieceView
-                .scaleEffect(isDragging ? 1.0 : 0.85)
+            pieceContent
                 .shadow(
-                    color: Color.black.opacity(isDragging ? 0.35 : 0.0),
+                    color: Color.black.opacity(isDragging ? 0.4 : 0.0),
                     radius: isDragging ? 12 : 0,
                     x: 0,
-                    y: isDragging ? 10 : 0
+                    y: isDragging ? 8 : 0
                 )
                 .offset(x: dragOffset.width, y: dragOffset.height + (isDragging ? verticalTouchOffset : 0))
                 .gesture(
                     DragGesture(coordinateSpace: .named("GameCoordinateSpace"))
                         .onChanged { value in
-                            handleDragChanged(value: value, trayPieceCenter: geo.frame(in: .named("GameCoordinateSpace")).center)
+                            let slotCenter = geo.frame(in: .named("GameCoordinateSpace")).center
+                            handleDragChanged(value: value, slotCenter: slotCenter, activeCellSize: activeCellSize, activeSpacing: activeSpacing)
                         }
                         .onEnded { value in
                             handleDragEnded(value: value)
@@ -54,14 +65,14 @@ public struct DraggablePieceView: View {
                 .zIndex(isDragging ? 999 : 1)
                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
-        .frame(width: 90, height: 90)
+        .frame(width: slotSize, height: slotSize)
     }
 
     @ViewBuilder
-    private func pieceShapeView(cellSize: CGFloat) -> some View {
+    private func pieceShapeView(cellSize: CGFloat, spacing: CGFloat) -> some View {
         let baseColor = gameState.activeTheme.tileColor(for: piece.colorIndex).swiftUIColor
-        let totalW = CGFloat(piece.width) * (cellSize + 2)
-        let totalH = CGFloat(piece.height) * (cellSize + 2)
+        let totalW = CGFloat(piece.width) * cellSize + CGFloat(piece.width - 1) * spacing
+        let totalH = CGFloat(piece.height) * cellSize + CGFloat(piece.height - 1) * spacing
 
         ZStack(alignment: .topLeading) {
             ForEach(piece.coordinates, id: \.self) { coord in
@@ -79,15 +90,15 @@ public struct DraggablePieceView: View {
                     )
                     .frame(width: cellSize, height: cellSize)
                     .offset(
-                        x: CGFloat(coord.col) * (cellSize + 2),
-                        y: CGFloat(coord.row) * (cellSize + 2)
+                        x: CGFloat(coord.col) * (cellSize + spacing),
+                        y: CGFloat(coord.row) * (cellSize + spacing)
                     )
             }
         }
         .frame(width: totalW, height: totalH)
     }
 
-    private func handleDragChanged(value: DragGesture.Value, trayPieceCenter: CGPoint) {
+    private func handleDragChanged(value: DragGesture.Value, slotCenter: CGPoint, activeCellSize: CGFloat, activeSpacing: CGFloat) {
         if !isDragging {
             isDragging = true
             HapticManager.shared.pieceHover()
@@ -95,25 +106,24 @@ public struct DraggablePieceView: View {
 
         dragOffset = value.translation
 
-        // Calculate floating top-left corner of the piece in the global coordinate space
-        let floatingPieceCenterX = trayPieceCenter.x + value.translation.width
-        let floatingPieceCenterY = trayPieceCenter.y + value.translation.height + verticalTouchOffset
+        // Calculate center of dragged piece in GameCoordinateSpace
+        let pieceCenterX = slotCenter.x + value.translation.width
+        let pieceCenterY = slotCenter.y + value.translation.height + verticalTouchOffset
 
-        let piecePixelWidth = CGFloat(piece.width) * (boardCellSize + 4)
-        let piecePixelHeight = CGFloat(piece.height) * (boardCellSize + 4)
+        let cellStep = activeCellSize + activeSpacing
 
-        let floatingOriginX = floatingPieceCenterX - (piecePixelWidth / 2.0)
-        let floatingOriginY = floatingPieceCenterY - (piecePixelHeight / 2.0)
+        // Center of the piece's top-left cell (Coordinate 0, 0)
+        let cell0CenterX = pieceCenterX - (CGFloat(piece.width - 1) * cellStep / 2.0)
+        let cell0CenterY = pieceCenterY - (CGFloat(piece.height - 1) * cellStep / 2.0)
 
-        // Calculate target board row/col
-        let relativeX = floatingOriginX - boardFrame.minX - 8.0 // account for board inner padding
-        let relativeY = floatingOriginY - boardFrame.minY - 8.0
+        // Board row 0, col 0 cell center
+        let board0CenterX = gridGeometry.frame.minX + (activeCellSize / 2.0)
+        let board0CenterY = gridGeometry.frame.minY + (activeCellSize / 2.0)
 
-        let colStep = boardCellSize + 4.0
-        let rowStep = boardCellSize + 4.0
+        guard cellStep > 0 else { return }
 
-        let targetCol = Int(round(relativeX / colStep))
-        let targetRow = Int(round(relativeY / rowStep))
+        let targetCol = Int(round((cell0CenterX - board0CenterX) / cellStep))
+        let targetRow = Int(round((cell0CenterY - board0CenterY) / cellStep))
 
         if targetRow >= 0 && targetRow <= (Board.size - piece.height) &&
            targetCol >= 0 && targetCol <= (Board.size - piece.width) {

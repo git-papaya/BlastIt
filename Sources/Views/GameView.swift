@@ -2,17 +2,10 @@ import SwiftUI
 
 public struct GameView: View {
     @StateObject private var gameState = GameState()
-    @State private var boardFrame: CGRect = .zero
+    @State private var gridGeometry: GridGeometry = GridGeometry()
     @State private var showThemeSheet: Bool = false
 
     public init() {}
-
-    private var boardCellSize: CGFloat {
-        let padding: CGFloat = 8.0
-        let innerSize = boardFrame.width - (padding * 2.0)
-        let spacingTotal = CGFloat(Board.size - 1) * 4.0
-        return max(10, (innerSize - spacingTotal) / CGFloat(Board.size))
-    }
 
     public var body: some View {
         ZStack {
@@ -35,20 +28,20 @@ public struct GameView: View {
                 Spacer()
 
                 // Center 8x8 Board
-                BoardView(gameState: gameState) { newFrame in
-                    boardFrame = newFrame
+                BoardView(gameState: gameState) { newGeometry in
+                    gridGeometry = newGeometry
                 }
                 .padding(.horizontal, 16)
 
                 Spacer()
 
-                // Bottom Piece Tray
+                // Bottom Piece Tray (zIndex elevated for drag clearance)
                 TrayView(
                     gameState: gameState,
-                    boardFrame: boardFrame,
-                    boardCellSize: boardCellSize
+                    gridGeometry: gridGeometry
                 )
-                .padding(.bottom, 16)
+                .zIndex(100)
+                .padding(.bottom, 20)
             }
 
             // Game Over Modal Overlay
