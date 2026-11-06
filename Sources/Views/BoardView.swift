@@ -1,19 +1,29 @@
 import SwiftUI
 
-public struct BoardFramePreferenceKey: PreferenceKey {
-    public static var defaultValue: CGRect = .zero
-    public static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+public struct GridGeometry: Equatable {
+    public var frame: CGRect = .zero
+    public var cellSize: CGFloat = 0
+
+    public init(frame: CGRect = .zero, cellSize: CGFloat = 0) {
+        self.frame = frame
+        self.cellSize = cellSize
+    }
+}
+
+public struct GridGeometryPreferenceKey: PreferenceKey {
+    public static var defaultValue: GridGeometry = GridGeometry()
+    public static func reduce(value: inout GridGeometry, nextValue: () -> GridGeometry) {
         value = nextValue()
     }
 }
 
 public struct BoardView: View {
     @ObservedObject var gameState: GameState
-    let onFrameChanged: (CGRect) -> Void
+    let onGridGeometryChanged: (GridGeometry) -> Void
 
-    public init(gameState: GameState, onFrameChanged: @escaping (CGRect) -> Void) {
+    public init(gameState: GameState, onGridGeometryChanged: @escaping (GridGeometry) -> Void) {
         self.gameState = gameState
-        self.onFrameChanged = onFrameChanged
+        self.onGridGeometryChanged = onGridGeometryChanged
     }
 
     public var body: some View {
@@ -21,7 +31,7 @@ public struct BoardView: View {
             let availableSize = min(geometry.size.width, geometry.size.height)
             let padding: CGFloat = 8
             let boardInnerSize = availableSize - (padding * 2)
-            let cellSize = (boardInnerSize - (CGFloat(Board.size - 1) * 4)) / CGFloat(Board.size)
+            let cellSize = max(10, (boardInnerSize - (CGFloat(Board.size - 1) * 4)) / CGFloat(Board.size))
 
             ZStack {
                 // Background Rounded Card
@@ -29,7 +39,7 @@ public struct BoardView: View {
                     .fill(gameState.activeTheme.boardBackground.swiftUIColor)
                     .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
 
-                // 8x8 Grid
+                // 8x8 Cell Grid
                 VStack(spacing: 4) {
                     ForEach(0..<Board.size, id: \.self) { row in
                         HStack(spacing: 4) {
@@ -39,6 +49,17 @@ public struct BoardView: View {
                         }
                     }
                 }
+                .background(
+                    GeometryReader { gridGeo in
+                        Color.clear.preference(
+                            key: GridGeometryPreferenceKey.self,
+                            value: GridGeometry(
+                                frame: gridGeo.frame(in: .named("GameCoordinateSpace")),
+                                cellSize: cellSize
+                            )
+                        )
+                    }
+                )
                 .padding(padding)
 
                 // Overlay Praise Message Banner (e.g. "Amazing!", "Cool!")
@@ -60,18 +81,12 @@ public struct BoardView: View {
             }
             .frame(width: availableSize, height: availableSize)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(
-                        key: BoardFramePreferenceKey.self,
-                        value: geo.frame(in: .named("GameCoordinateSpace"))
-                    )
-                }
-            )
         }
         .aspectRatio(1.0, contentMode: .fit)
-        .onPreferenceChange(BoardFramePreferenceKey.self) { frame in
-            onFrameChanged(frame)
+        .onPreferenceChange(GridGeometryPreferenceKey.self) { geo in
+            if geo.cellSize > 0 && geo.frame.width > 0 {
+                onGridGeometryChanged(geo)
+            }
         }
     }
 
