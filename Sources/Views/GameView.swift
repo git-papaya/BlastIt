@@ -35,13 +35,23 @@ public struct GameView: View {
 
                 Spacer()
 
-                // Bottom Piece Tray (zIndex elevated for drag clearance)
+                // Bottom Piece Tray
                 TrayView(
                     gameState: gameState,
                     gridGeometry: gridGeometry
                 )
-                .zIndex(100)
                 .padding(.bottom, 20)
+            }
+
+            // Root-Level Dragging Piece Overlay (Always on top of entire screen!)
+            if let drag = gameState.activeDrag {
+                FloatingPieceView(
+                    piece: drag.piece,
+                    touchLocation: drag.touchLocation,
+                    cellSize: gridGeometry.cellSize > 0 ? gridGeometry.cellSize : 38.0,
+                    theme: gameState.activeTheme
+                )
+                .zIndex(9999)
             }
 
             // Game Over Modal Overlay

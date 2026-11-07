@@ -28,16 +28,16 @@ public struct BoardView: View {
 
     public var body: some View {
         GeometryReader { geometry in
-            let availableSize = min(geometry.size.width, geometry.size.height)
+            let boardSize = min(geometry.size.width, geometry.size.height)
             let padding: CGFloat = 8
-            let boardInnerSize = availableSize - (padding * 2)
+            let boardInnerSize = boardSize - (padding * 2)
             let cellSize = max(10, (boardInnerSize - (CGFloat(Board.size - 1) * 4)) / CGFloat(Board.size))
 
             ZStack {
                 // Background Rounded Card
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(gameState.activeTheme.boardBackground.swiftUIColor)
-                    .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
+                    .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 6)
 
                 // 8x8 Cell Grid
                 VStack(spacing: 4) {
@@ -79,7 +79,7 @@ public struct BoardView: View {
                         .id(gameState.praiseId)
                 }
             }
-            .frame(width: availableSize, height: availableSize)
+            .frame(width: boardSize, height: boardSize)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
         .aspectRatio(1.0, contentMode: .fit)

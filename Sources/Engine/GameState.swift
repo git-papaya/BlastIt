@@ -1,6 +1,28 @@
 import SwiftUI
 import Combine
 
+public struct ActiveDragState: Equatable {
+    public let pieceIndex: Int
+    public let piece: Piece
+    public var touchLocation: CGPoint
+    public var hoverCell: (row: Int, col: Int)?
+
+    public init(pieceIndex: Int, piece: Piece, touchLocation: CGPoint, hoverCell: (row: Int, col: Int)? = nil) {
+        self.pieceIndex = pieceIndex
+        self.piece = piece
+        self.touchLocation = touchLocation
+        self.hoverCell = hoverCell
+    }
+
+    public static func == (lhs: ActiveDragState, rhs: ActiveDragState) -> Bool {
+        lhs.pieceIndex == rhs.pieceIndex &&
+        lhs.piece.id == rhs.piece.id &&
+        lhs.touchLocation == rhs.touchLocation &&
+        lhs.hoverCell?.row == rhs.hoverCell?.row &&
+        lhs.hoverCell?.col == rhs.hoverCell?.col
+    }
+}
+
 public final class GameState: ObservableObject {
     @Published public var board: Board = Board()
     @Published public var trayPieces: [Piece?] = [nil, nil, nil]
@@ -13,6 +35,7 @@ public final class GameState: ObservableObject {
     @Published public var activeTheme: GameTheme
     @Published public var ghostPlacement: (originRow: Int, originCol: Int, piece: Piece)? = nil
     @Published public var animatedClearingCells: Set<Coordinate> = []
+    @Published public var activeDrag: ActiveDragState? = nil
 
     private var pieceGenerator = PieceGenerator()
     private var scoreManager: ScoreManager
@@ -41,6 +64,7 @@ public final class GameState: ObservableObject {
         latestPraise = nil
         ghostPlacement = nil
         animatedClearingCells = []
+        activeDrag = nil
 
         dealNewHand()
     }
@@ -51,18 +75,71 @@ public final class GameState: ObservableObject {
         checkGameOverCondition()
     }
 
-    public func setGhostPlacement(originRow: Int?, originCol: Int?, piece: Piece?) {
-        guard let r = originRow, let c = originCol, let p = piece else {
-            ghostPlacement = nil
-            return
+    // MARK: - Drag & Drop Coordinator
+
+    public func startDrag(index: Int, piece: Piece, location: CGPoint) {
+        activeDrag = ActiveDragState(pieceIndex: index, piece: piece, touchLocation: location)
+        haptics.pieceHover()
+    }
+
+    public func updateDrag(location: CGPoint, gridGeometry: GridGeometry) {
+        guard var drag = activeDrag else { return }
+        drag.touchLocation = location
+
+        let piece = drag.piece
+        let activeCellSize = gridGeometry.cellSize > 0 ? gridGeometry.cellSize : 38.0
+        let cellStep = activeCellSize + 4.0
+
+        // Floating piece center with -65pt vertical offset above finger
+        let pieceCenterX = location.x
+        let pieceCenterY = location.y - 65.0
+
+        // Center of top-left cell (0, 0) of the dragged piece
+        let cell0CenterX = pieceCenterX - (CGFloat(piece.width - 1) * cellStep / 2.0)
+        let cell0CenterY = pieceCenterY - (CGFloat(piece.height - 1) * cellStep / 2.0)
+
+        // Board row 0, col 0 cell center
+        let board0CenterX = gridGeometry.frame.minX + (activeCellSize / 2.0)
+        let board0CenterY = gridGeometry.frame.minY + (activeCellSize / 2.0)
+
+        if cellStep > 0 && gridGeometry.frame.width > 0 {
+            let targetCol = Int(round((cell0CenterX - board0CenterX) / cellStep))
+            let targetRow = Int(round((cell0CenterY - board0CenterY) / cellStep))
+
+            if targetRow >= 0 && targetRow <= (Board.size - piece.height) &&
+               targetCol >= 0 && targetCol <= (Board.size - piece.width) {
+                if board.canPlace(piece: piece, atOriginRow: targetRow, originCol: targetCol) {
+                    if drag.hoverCell?.row != targetRow || drag.hoverCell?.col != targetCol {
+                        drag.hoverCell = (targetRow, targetCol)
+                        haptics.pieceHover()
+                    }
+                    ghostPlacement = (targetRow, targetCol, piece)
+                    activeDrag = drag
+                    return
+                }
+            }
         }
 
-        if board.canPlace(piece: p, atOriginRow: r, originCol: c) {
-            ghostPlacement = (r, c, p)
-        } else {
-            ghostPlacement = nil
-        }
+        drag.hoverCell = nil
+        ghostPlacement = nil
+        activeDrag = drag
     }
+
+    public func endDrag() {
+        guard let drag = activeDrag else { return }
+        if let target = drag.hoverCell {
+            _ = placePiece(index: drag.pieceIndex, atOriginRow: target.row, originCol: target.col)
+        }
+        activeDrag = nil
+        ghostPlacement = nil
+    }
+
+    public func cancelDrag() {
+        activeDrag = nil
+        ghostPlacement = nil
+    }
+
+    // MARK: - Game Actions
 
     public func placePiece(index: Int, atOriginRow originRow: Int, originCol: Int) -> Bool {
         guard index >= 0 && index < trayPieces.count, let piece = trayPieces[index] else {
