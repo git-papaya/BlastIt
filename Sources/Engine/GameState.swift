@@ -5,12 +5,20 @@ public struct ActiveDragState: Equatable {
     public let pieceIndex: Int
     public let piece: Piece
     public var touchLocation: CGPoint
+    public var visualCenter: CGPoint
     public var hoverCell: (row: Int, col: Int)?
 
-    public init(pieceIndex: Int, piece: Piece, touchLocation: CGPoint, hoverCell: (row: Int, col: Int)? = nil) {
+    public init(
+        pieceIndex: Int,
+        piece: Piece,
+        touchLocation: CGPoint,
+        visualCenter: CGPoint = .zero,
+        hoverCell: (row: Int, col: Int)? = nil
+    ) {
         self.pieceIndex = pieceIndex
         self.piece = piece
         self.touchLocation = touchLocation
+        self.visualCenter = visualCenter
         self.hoverCell = hoverCell
     }
 
@@ -18,6 +26,7 @@ public struct ActiveDragState: Equatable {
         lhs.pieceIndex == rhs.pieceIndex &&
         lhs.piece.id == rhs.piece.id &&
         lhs.touchLocation == rhs.touchLocation &&
+        lhs.visualCenter == rhs.visualCenter &&
         lhs.hoverCell?.row == rhs.hoverCell?.row &&
         lhs.hoverCell?.col == rhs.hoverCell?.col
     }
@@ -38,8 +47,9 @@ public final class GameState: ObservableObject {
     @Published public var activeDrag: ActiveDragState? = nil
 
     // Geometry measured from BoardView in window (.global) coordinates
-    @Published public var boardGridOrigin: CGPoint = CGPoint(x: 24.0, y: 220.0)
+    @Published public var boardGridOrigin: CGPoint = .zero
     @Published public var boardCellSize: CGFloat = 38.0
+    @Published public var boardGridFrame: CGRect = .zero
 
     private var pieceGenerator = PieceGenerator()
     private var scoreManager: ScoreManager
@@ -55,16 +65,34 @@ public final class GameState: ObservableObject {
         self.sound.isSoundEnabled = persistence.isSoundEnabled
         self.haptics.isHapticsEnabled = persistence.isHapticsEnabled
 
-        // Initialize reasonable geometry defaults based on screen size
+        // Initialize realistic geometry based on screen dimensions
         let screenW = UIScreen.main.bounds.width
-        let boardSize = min(screenW - 32.0, 380.0)
-        let innerSize = boardSize - 16.0
-        let cSize = (innerSize - 28.0) / 8.0
-        let originX = (screenW - boardSize) / 2.0 + 8.0
-        self.boardGridOrigin = CGPoint(x: originX, y: 220.0)
-        self.boardCellSize = cSize
+        let screenH = UIScreen.main.bounds.height
+        let boardSide = min(screenW - 32.0, 380.0)
+        let padding: CGFloat = 8.0
+        let gridSide = boardSide - (padding * 2.0)
+        let cSize = (gridSide - 28.0) / 8.0
+        let originX = (screenW - gridSide) / 2.0
+        // Board is centered in vertical space between header (~160pt) and tray (~130pt)
+        let availableH = screenH - 160.0 - 130.0
+        let boardTop = 160.0 + max(0, (availableH - boardSide) / 2.0)
+        let originY = boardTop + padding
+
+        self.boardGridOrigin = CGPoint(x: originX, y: originY)
+        self.boardCellSize = max(20.0, cSize)
+        self.boardGridFrame = CGRect(x: originX, y: originY, width: gridSide, height: gridSide)
 
         startNewGame()
+    }
+
+    public func updateGridGeometry(frame: CGRect) {
+        guard frame.width > 0 && frame.height > 0 else { return }
+        self.boardGridFrame = frame
+        self.boardGridOrigin = frame.origin
+        let calculatedCell = (frame.width - CGFloat(Board.size - 1) * 4.0) / CGFloat(Board.size)
+        if calculatedCell > 15.0 {
+            self.boardCellSize = calculatedCell
+        }
     }
 
     public func setBoardGeometry(origin: CGPoint, cellSize: CGFloat) {
@@ -97,8 +125,19 @@ public final class GameState: ObservableObject {
     // MARK: - Drag & Drop Coordinator
 
     public func startDrag(index: Int, piece: Piece, location: CGPoint) {
-        activeDrag = ActiveDragState(pieceIndex: index, piece: piece, touchLocation: location)
+        let baseLift: CGFloat = 48.0
+        let fingerGridY = location.y - boardGridOrigin.y
+        let lift = BoardLayout.adaptiveLiftOffset(fingerGridY: fingerGridY, baseOffset: baseLift)
+        let visualCenter = CGPoint(x: location.x, y: location.y - lift)
+
+        activeDrag = ActiveDragState(
+            pieceIndex: index,
+            piece: piece,
+            touchLocation: location,
+            visualCenter: visualCenter
+        )
         haptics.pieceHover()
+        updateDrag(location: location)
     }
 
     public func updateDrag(location: CGPoint) {
@@ -107,41 +146,42 @@ public final class GameState: ObservableObject {
 
         let piece = drag.piece
         let cellSize = boardCellSize > 0 ? boardCellSize : 38.0
-        let cellStep = cellSize + 4.0
-        let fingerOffset: CGFloat = 60.0
+        let cellSpacing: CGFloat = 4.0
+        let baseLift: CGFloat = 48.0
 
-        // Floating piece center in screen coordinates
-        let pieceCenterX = location.x
-        let pieceCenterY = location.y - fingerOffset
+        let fingerGridY = location.y - boardGridOrigin.y
+        let lift = BoardLayout.adaptiveLiftOffset(fingerGridY: fingerGridY, baseOffset: baseLift)
+        let visualCenter = CGPoint(x: location.x, y: location.y - lift)
+        drag.visualCenter = visualCenter
 
-        // Center of top-left cell (0, 0) of the piece
-        let cell0CenterX = pieceCenterX - (CGFloat(piece.width - 1) * cellStep / 2.0)
-        let cell0CenterY = pieceCenterY - (CGFloat(piece.height - 1) * cellStep / 2.0)
+        // Grid-relative visual center
+        let gridRelativeCenter = CGPoint(
+            x: visualCenter.x - boardGridOrigin.x,
+            y: visualCenter.y - boardGridOrigin.y
+        )
 
-        // Board cell (0, 0) center in screen coordinates
-        let board0CenterX = boardGridOrigin.x + (cellSize / 2.0)
-        let board0CenterY = boardGridOrigin.y + (cellSize / 2.0)
-
-        if cellStep > 0 {
-            let targetCol = Int(round((cell0CenterX - board0CenterX) / cellStep))
-            let targetRow = Int(round((cell0CenterY - board0CenterY) / cellStep))
-
-            if targetRow >= 0 && targetRow <= (Board.size - piece.height) &&
-               targetCol >= 0 && targetCol <= (Board.size - piece.width) {
-                if board.canPlace(piece: piece, atOriginRow: targetRow, originCol: targetCol) {
-                    if drag.hoverCell?.row != targetRow || drag.hoverCell?.col != targetCol {
-                        drag.hoverCell = (targetRow, targetCol)
-                        haptics.pieceHover()
-                    }
-                    ghostPlacement = (targetRow, targetCol, piece)
-                    activeDrag = drag
-                    return
-                }
+        // Find candidate placement with minimum distance to visualCenter
+        if let placement = BoardLayout.findOptimalPlacement(
+            for: piece,
+            nearPoint: gridRelativeCenter,
+            cellSize: cellSize,
+            cellSpacing: cellSpacing,
+            gridSize: Board.size,
+            maxDistance: 260.0,
+            canPlace: { p, r, c in
+                self.board.canPlace(piece: p, atOriginRow: r, originCol: c)
             }
+        ) {
+            if drag.hoverCell?.row != placement.row || drag.hoverCell?.col != placement.col {
+                drag.hoverCell = placement
+                haptics.pieceHover()
+            }
+            ghostPlacement = (placement.row, placement.col, piece)
+        } else {
+            drag.hoverCell = nil
+            ghostPlacement = nil
         }
 
-        drag.hoverCell = nil
-        ghostPlacement = nil
         activeDrag = drag
     }
 

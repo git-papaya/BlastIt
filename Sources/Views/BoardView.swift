@@ -1,5 +1,15 @@
 import SwiftUI
 
+public struct GridFramePreferenceKey: PreferenceKey {
+    public static var defaultValue: CGRect = .zero
+    public static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
+    }
+}
+
 public struct BoardView: View {
     @ObservedObject var gameState: GameState
 
@@ -7,75 +17,70 @@ public struct BoardView: View {
         self.gameState = gameState
     }
 
+    private var boardSize: CGFloat {
+        let screenW = UIScreen.main.bounds.width
+        return min(screenW - 32.0, 380.0)
+    }
+
+    private let padding: CGFloat = 8.0
+    private let cellSpacing: CGFloat = 4.0
+
+    private var cellSize: CGFloat {
+        let gridSide = boardSize - (padding * 2.0)
+        return max(10.0, (gridSide - (CGFloat(Board.size - 1) * cellSpacing)) / CGFloat(Board.size))
+    }
+
     public var body: some View {
-        GeometryReader { geometry in
-            let boardSize = min(geometry.size.width, geometry.size.height)
-            let padding: CGFloat = 8
-            let boardInnerSize = boardSize - (padding * 2)
-            let cellSize = max(10, (boardInnerSize - (CGFloat(Board.size - 1) * 4)) / CGFloat(Board.size))
+        ZStack {
+            // Background Rounded Card
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(gameState.activeTheme.boardBackground.swiftUIColor)
+                .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 6)
 
-            ZStack {
-                // Background Rounded Card
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(gameState.activeTheme.boardBackground.swiftUIColor)
-                    .shadow(color: Color.black.opacity(0.25), radius: 12, x: 0, y: 6)
-
-                // 8x8 Cell Grid
-                VStack(spacing: 4) {
-                    ForEach(0..<Board.size, id: \.self) { row in
-                        HStack(spacing: 4) {
-                            ForEach(0..<Board.size, id: \.self) { col in
-                                cellView(row: row, col: col, cellSize: cellSize)
-                            }
+            // 8x8 Cell Grid
+            VStack(spacing: cellSpacing) {
+                ForEach(0..<Board.size, id: \.self) { row in
+                    HStack(spacing: cellSpacing) {
+                        ForEach(0..<Board.size, id: \.self) { col in
+                            cellView(row: row, col: col, cellSize: cellSize)
                         }
                     }
                 }
-                .background(
-                    GeometryReader { gridGeo in
-                        Color.clear
-                            .onAppear {
-                                let frame = gridGeo.frame(in: .global)
-                                if frame.origin.x > 0 && frame.origin.y > 0 {
-                                    gameState.setBoardGeometry(origin: frame.origin, cellSize: cellSize)
-                                }
-                            }
-                            .onChange(of: gridGeo.frame(in: .global)) { frame in
-                                if frame.origin.x > 0 && frame.origin.y > 0 {
-                                    gameState.setBoardGeometry(origin: frame.origin, cellSize: cellSize)
-                                }
-                            }
-                    }
-                )
-                .padding(padding)
-
-                // Overlay Praise Message Banner (e.g. "Amazing!", "Cool!")
-                if let praise = gameState.latestPraise {
-                    Text(praise.rawValue)
-                        .font(.system(size: 38, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.yellow, Color.orange, Color.red],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-                        .scaleEffect(1.0)
-                        .transition(.scale(scale: 0.5).combined(with: .opacity))
-                        .id(gameState.praiseId)
-                }
             }
-            .frame(width: boardSize, height: boardSize)
-            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            .onAppear {
-                let screenW = UIScreen.main.bounds.width
-                let bSize = min(screenW - 32.0, 380.0)
-                let cSize = (bSize - 16.0 - 28.0) / 8.0
-                let originX = (screenW - bSize) / 2.0 + 8.0
-                gameState.setBoardGeometry(origin: CGPoint(x: originX, y: 220.0), cellSize: cSize)
+            .background(
+                GeometryReader { gridGeo in
+                    Color.clear.preference(
+                        key: GridFramePreferenceKey.self,
+                        value: gridGeo.frame(in: .global)
+                    )
+                }
+            )
+            .padding(padding)
+
+            // Overlay Praise Message Banner (e.g. "Amazing!", "Cool!")
+            if let praise = gameState.latestPraise {
+                Text(praise.rawValue)
+                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.yellow, Color.orange, Color.red],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                    .scaleEffect(1.0)
+                    .transition(.scale(scale: 0.5).combined(with: .opacity))
+                    .id(gameState.praiseId)
             }
         }
-        .aspectRatio(1.0, contentMode: .fit)
+        .frame(width: boardSize, height: boardSize)
+        .onPreferenceChange(GridFramePreferenceKey.self) { frame in
+            guard frame.width > 0 && frame.height > 0 else { return }
+            DispatchQueue.main.async {
+                gameState.updateGridGeometry(frame: frame)
+            }
+        }
     }
 
     @ViewBuilder

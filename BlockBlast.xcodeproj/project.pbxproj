@@ -26,6 +26,7 @@
 		AA0100112C00000000000001 /* GameOverOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200112C00000000000001 /* GameOverOverlayView.swift */; };
 		AA0100122C00000000000001 /* ThemeSelectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200122C00000000000001 /* ThemeSelectionSheet.swift */; };
 		AA0100142C00000000000001 /* FloatingPieceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200152C00000000000001 /* FloatingPieceView.swift */; };
+		AA0100152C00000000000001 /* BoardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200162C00000000000001 /* BoardLayout.swift */; };
 		AA0100132C00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0200132C00000000000001 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -50,6 +51,7 @@
 		AA0200112C00000000000001 /* GameOverOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverOverlayView.swift; sourceTree = "<group>"; };
 		AA0200122C00000000000001 /* ThemeSelectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeSelectionSheet.swift; sourceTree = "<group>"; };
 		AA0200152C00000000000001 /* FloatingPieceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPieceView.swift; sourceTree = "<group>"; };
+		AA0200162C00000000000001 /* BoardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardLayout.swift; sourceTree = "<group>"; };
 		AA0200132C00000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA0200142C00000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -122,6 +124,7 @@
 				AA0200042C00000000000001 /* PieceGenerator.swift */,
 				AA0200052C00000000000001 /* ScoreManager.swift */,
 				AA0200062C00000000000001 /* GameState.swift */,
+				AA0200162C00000000000001 /* BoardLayout.swift */,
 			);
 			path = Engine;
 			sourceTree = "<group>";
@@ -242,6 +245,7 @@
 				AA0100042C00000000000001 /* PieceGenerator.swift in Sources */,
 				AA0100052C00000000000001 /* ScoreManager.swift in Sources */,
 				AA0100062C00000000000001 /* GameState.swift in Sources */,
+				AA0100152C00000000000001 /* BoardLayout.swift in Sources */,
 				AA0100072C00000000000001 /* SoundManager.swift in Sources */,
 				AA0100082C00000000000001 /* HapticManager.swift in Sources */,
 				AA0100092C00000000000001 /* Theme.swift in Sources */,

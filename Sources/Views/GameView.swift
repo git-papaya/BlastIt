@@ -42,8 +42,9 @@ public struct GameView: View {
             if let drag = gameState.activeDrag {
                 FloatingPieceView(
                     piece: drag.piece,
-                    touchLocation: drag.touchLocation,
+                    visualCenter: drag.visualCenter,
                     cellSize: gameState.boardCellSize > 0 ? gameState.boardCellSize : 38.0,
+                    cellSpacing: 4.0,
                     theme: gameState.activeTheme
                 )
                 .zIndex(9999)

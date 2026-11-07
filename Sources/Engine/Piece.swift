@@ -10,6 +10,28 @@ public struct Coordinate: Hashable, Equatable, Codable {
     }
 }
 
+public struct Bounds: Equatable {
+    public let minRow: Int
+    public let maxRow: Int
+    public let minCol: Int
+    public let maxCol: Int
+
+    public var width: Int {
+        maxCol - minCol + 1
+    }
+
+    public var height: Int {
+        maxRow - minRow + 1
+    }
+
+    public init(minRow: Int, maxRow: Int, minCol: Int, maxCol: Int) {
+        self.minRow = minRow
+        self.maxRow = maxRow
+        self.minCol = minCol
+        self.maxCol = maxCol
+    }
+}
+
 public enum PieceShape: String, CaseIterable, Codable {
     // 1-cell
     case dot1x1
@@ -167,14 +189,29 @@ public struct Piece: Identifiable, Equatable, Codable {
     public let coordinates: [Coordinate]
     public let colorIndex: Int
 
+    public var bounds: Bounds {
+        guard let first = coordinates.first else {
+            return Bounds(minRow: 0, maxRow: 0, minCol: 0, maxCol: 0)
+        }
+        var minR = first.row
+        var maxR = first.row
+        var minC = first.col
+        var maxC = first.col
+        for coord in coordinates {
+            if coord.row < minR { minR = coord.row }
+            if coord.row > maxR { maxR = coord.row }
+            if coord.col < minC { minC = coord.col }
+            if coord.col > maxC { maxC = coord.col }
+        }
+        return Bounds(minRow: minR, maxRow: maxR, minCol: minC, maxCol: maxC)
+    }
+
     public var width: Int {
-        let maxCol = coordinates.map(\.col).max() ?? 0
-        return maxCol + 1
+        bounds.width
     }
 
     public var height: Int {
-        let maxRow = coordinates.map(\.row).max() ?? 0
-        return maxRow + 1
+        bounds.height
     }
 
     public var cellCount: Int {
