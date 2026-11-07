@@ -6,7 +6,7 @@ public struct FloatingPieceView: View {
     public let cellSize: CGFloat
     public let theme: GameTheme
 
-    private let verticalOffset: CGFloat = -65.0
+    private let verticalOffset: CGFloat = -60.0
     private let spacing: CGFloat = 4.0
 
     public init(piece: Piece, touchLocation: CGPoint, cellSize: CGFloat, theme: GameTheme) {

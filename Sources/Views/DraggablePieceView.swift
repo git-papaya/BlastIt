@@ -4,7 +4,6 @@ public struct DraggablePieceView: View {
     public let piece: Piece
     public let index: Int
     @ObservedObject var gameState: GameState
-    public let gridGeometry: GridGeometry
     public let slotSize: CGFloat
 
     private var maxDimension: Int {
@@ -12,31 +11,32 @@ public struct DraggablePieceView: View {
     }
 
     private var trayCellSize: CGFloat {
-        let available = slotSize - 22.0
-        let spacingTotal = CGFloat(maxDimension - 1) * 2.0
-        let calculated = (available - spacingTotal) / CGFloat(maxDimension)
-        return max(10.0, min(18.0, calculated))
+        switch maxDimension {
+        case 1: return 36.0
+        case 2: return 28.0
+        case 3: return 22.0
+        case 4: return 17.5
+        default: return 14.0
+        }
     }
 
     public init(
         piece: Piece,
         index: Int,
         gameState: GameState,
-        gridGeometry: GridGeometry,
         slotSize: CGFloat
     ) {
         self.piece = piece
         self.index = index
         self.gameState = gameState
-        self.gridGeometry = gridGeometry
         self.slotSize = slotSize
     }
 
     public var body: some View {
         let isBeingDragged = gameState.activeDrag?.pieceIndex == index
         let baseColor = gameState.activeTheme.tileColor(for: piece.colorIndex).swiftUIColor
-        let totalW = CGFloat(piece.width) * trayCellSize + CGFloat(piece.width - 1) * 2.0
-        let totalH = CGFloat(piece.height) * trayCellSize + CGFloat(piece.height - 1) * 2.0
+        let totalW = CGFloat(piece.width) * trayCellSize + CGFloat(piece.width - 1) * 2.5
+        let totalH = CGFloat(piece.height) * trayCellSize + CGFloat(piece.height - 1) * 2.5
 
         ZStack {
             // Card container background
@@ -47,13 +47,13 @@ public struct DraggablePieceView: View {
                         .strokeBorder(gameState.activeTheme.gridLine.swiftUIColor, lineWidth: 1.2)
                 )
 
-            // Piece Grid - fully centered by ZStack layout
-            VStack(spacing: 2.0) {
+            // Piece Grid - precisely centered inside card by ZStack
+            VStack(spacing: 2.5) {
                 ForEach(0..<piece.height, id: \.self) { r in
-                    HStack(spacing: 2.0) {
+                    HStack(spacing: 2.5) {
                         ForEach(0..<piece.width, id: \.self) { c in
                             if piece.coordinates.contains(Coordinate(row: r, col: c)) {
-                                RoundedRectangle(cornerRadius: max(2.5, trayCellSize * 0.22), style: .continuous)
+                                RoundedRectangle(cornerRadius: max(3.0, trayCellSize * 0.22), style: .continuous)
                                     .fill(
                                         LinearGradient(
                                             colors: [baseColor.opacity(0.85), baseColor],
@@ -62,12 +62,13 @@ public struct DraggablePieceView: View {
                                         )
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: max(2.5, trayCellSize * 0.22), style: .continuous)
+                                        RoundedRectangle(cornerRadius: max(3.0, trayCellSize * 0.22), style: .continuous)
                                             .strokeBorder(Color.white.opacity(0.35), lineWidth: 1.0)
                                     )
                                     .frame(width: trayCellSize, height: trayCellSize)
                             } else {
-                                Color.clear
+                                Rectangle()
+                                    .fill(Color.clear)
                                     .frame(width: trayCellSize, height: trayCellSize)
                             }
                         }
@@ -85,7 +86,7 @@ public struct DraggablePieceView: View {
                     if gameState.activeDrag?.pieceIndex != index {
                         gameState.startDrag(index: index, piece: piece, location: value.location)
                     }
-                    gameState.updateDrag(location: value.location, gridGeometry: gridGeometry)
+                    gameState.updateDrag(location: value.location)
                 }
                 .onEnded { _ in
                     gameState.endDrag()

@@ -1,29 +1,10 @@
 import SwiftUI
 
-public struct GridGeometry: Equatable {
-    public var frame: CGRect = .zero
-    public var cellSize: CGFloat = 0
-
-    public init(frame: CGRect = .zero, cellSize: CGFloat = 0) {
-        self.frame = frame
-        self.cellSize = cellSize
-    }
-}
-
-public struct GridGeometryPreferenceKey: PreferenceKey {
-    public static var defaultValue: GridGeometry = GridGeometry()
-    public static func reduce(value: inout GridGeometry, nextValue: () -> GridGeometry) {
-        value = nextValue()
-    }
-}
-
 public struct BoardView: View {
     @ObservedObject var gameState: GameState
-    let onGridGeometryChanged: (GridGeometry) -> Void
 
-    public init(gameState: GameState, onGridGeometryChanged: @escaping (GridGeometry) -> Void) {
+    public init(gameState: GameState) {
         self.gameState = gameState
-        self.onGridGeometryChanged = onGridGeometryChanged
     }
 
     public var body: some View {
@@ -51,13 +32,18 @@ public struct BoardView: View {
                 }
                 .background(
                     GeometryReader { gridGeo in
-                        Color.clear.preference(
-                            key: GridGeometryPreferenceKey.self,
-                            value: GridGeometry(
-                                frame: gridGeo.frame(in: .global),
-                                cellSize: cellSize
-                            )
-                        )
+                        Color.clear
+                            .onAppear {
+                                let frame = gridGeo.frame(in: .global)
+                                if frame.origin.x > 0 && frame.origin.y > 0 {
+                                    gameState.setBoardGeometry(origin: frame.origin, cellSize: cellSize)
+                                }
+                            }
+                            .onChange(of: gridGeo.frame(in: .global)) { frame in
+                                if frame.origin.x > 0 && frame.origin.y > 0 {
+                                    gameState.setBoardGeometry(origin: frame.origin, cellSize: cellSize)
+                                }
+                            }
                     }
                 )
                 .padding(padding)
@@ -81,13 +67,15 @@ public struct BoardView: View {
             }
             .frame(width: boardSize, height: boardSize)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-        }
-        .aspectRatio(1.0, contentMode: .fit)
-        .onPreferenceChange(GridGeometryPreferenceKey.self) { geo in
-            if geo.cellSize > 0 && geo.frame.width > 0 {
-                onGridGeometryChanged(geo)
+            .onAppear {
+                let screenW = UIScreen.main.bounds.width
+                let bSize = min(screenW - 32.0, 380.0)
+                let cSize = (bSize - 16.0 - 28.0) / 8.0
+                let originX = (screenW - bSize) / 2.0 + 8.0
+                gameState.setBoardGeometry(origin: CGPoint(x: originX, y: 220.0), cellSize: cSize)
             }
         }
+        .aspectRatio(1.0, contentMode: .fit)
     }
 
     @ViewBuilder

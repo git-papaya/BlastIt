@@ -2,11 +2,9 @@ import SwiftUI
 
 public struct TrayView: View {
     @ObservedObject var gameState: GameState
-    public let gridGeometry: GridGeometry
 
-    public init(gameState: GameState, gridGeometry: GridGeometry) {
+    public init(gameState: GameState) {
         self.gameState = gameState
-        self.gridGeometry = gridGeometry
     }
 
     public var body: some View {
@@ -17,7 +15,6 @@ public struct TrayView: View {
                         piece: piece,
                         index: index,
                         gameState: gameState,
-                        gridGeometry: gridGeometry,
                         slotSize: 92.0
                     )
                 } else {

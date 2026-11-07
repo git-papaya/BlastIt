@@ -37,6 +37,10 @@ public final class GameState: ObservableObject {
     @Published public var animatedClearingCells: Set<Coordinate> = []
     @Published public var activeDrag: ActiveDragState? = nil
 
+    // Geometry measured from BoardView in window (.global) coordinates
+    @Published public var boardGridOrigin: CGPoint = CGPoint(x: 24.0, y: 220.0)
+    @Published public var boardCellSize: CGFloat = 38.0
+
     private var pieceGenerator = PieceGenerator()
     private var scoreManager: ScoreManager
     private let persistence = PersistenceManager.shared
@@ -51,7 +55,22 @@ public final class GameState: ObservableObject {
         self.sound.isSoundEnabled = persistence.isSoundEnabled
         self.haptics.isHapticsEnabled = persistence.isHapticsEnabled
 
+        // Initialize reasonable geometry defaults based on screen size
+        let screenW = UIScreen.main.bounds.width
+        let boardSize = min(screenW - 32.0, 380.0)
+        let innerSize = boardSize - 16.0
+        let cSize = (innerSize - 28.0) / 8.0
+        let originX = (screenW - boardSize) / 2.0 + 8.0
+        self.boardGridOrigin = CGPoint(x: originX, y: 220.0)
+        self.boardCellSize = cSize
+
         startNewGame()
+    }
+
+    public func setBoardGeometry(origin: CGPoint, cellSize: CGFloat) {
+        guard origin.x > 0 && origin.y > 0 && cellSize > 0 else { return }
+        self.boardGridOrigin = origin
+        self.boardCellSize = cellSize
     }
 
     public func startNewGame() {
@@ -82,27 +101,28 @@ public final class GameState: ObservableObject {
         haptics.pieceHover()
     }
 
-    public func updateDrag(location: CGPoint, gridGeometry: GridGeometry) {
+    public func updateDrag(location: CGPoint) {
         guard var drag = activeDrag else { return }
         drag.touchLocation = location
 
         let piece = drag.piece
-        let activeCellSize = gridGeometry.cellSize > 0 ? gridGeometry.cellSize : 38.0
-        let cellStep = activeCellSize + 4.0
+        let cellSize = boardCellSize > 0 ? boardCellSize : 38.0
+        let cellStep = cellSize + 4.0
+        let fingerOffset: CGFloat = 60.0
 
-        // Floating piece center with -65pt vertical offset above finger
+        // Floating piece center in screen coordinates
         let pieceCenterX = location.x
-        let pieceCenterY = location.y - 65.0
+        let pieceCenterY = location.y - fingerOffset
 
-        // Center of top-left cell (0, 0) of the dragged piece
+        // Center of top-left cell (0, 0) of the piece
         let cell0CenterX = pieceCenterX - (CGFloat(piece.width - 1) * cellStep / 2.0)
         let cell0CenterY = pieceCenterY - (CGFloat(piece.height - 1) * cellStep / 2.0)
 
-        // Board row 0, col 0 cell center
-        let board0CenterX = gridGeometry.frame.minX + (activeCellSize / 2.0)
-        let board0CenterY = gridGeometry.frame.minY + (activeCellSize / 2.0)
+        // Board cell (0, 0) center in screen coordinates
+        let board0CenterX = boardGridOrigin.x + (cellSize / 2.0)
+        let board0CenterY = boardGridOrigin.y + (cellSize / 2.0)
 
-        if cellStep > 0 && gridGeometry.frame.width > 0 {
+        if cellStep > 0 {
             let targetCol = Int(round((cell0CenterX - board0CenterX) / cellStep))
             let targetRow = Int(round((cell0CenterY - board0CenterY) / cellStep))
 
