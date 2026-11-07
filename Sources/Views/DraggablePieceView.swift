@@ -12,10 +12,10 @@ public struct DraggablePieceView: View {
     }
 
     private var trayCellSize: CGFloat {
-        let available = slotSize - 20.0
+        let available = slotSize - 22.0
         let spacingTotal = CGFloat(maxDimension - 1) * 2.0
         let calculated = (available - spacingTotal) / CGFloat(maxDimension)
-        return max(10.0, min(20.0, calculated))
+        return max(10.0, min(18.0, calculated))
     }
 
     public init(
@@ -35,38 +35,52 @@ public struct DraggablePieceView: View {
     public var body: some View {
         let isBeingDragged = gameState.activeDrag?.pieceIndex == index
         let baseColor = gameState.activeTheme.tileColor(for: piece.colorIndex).swiftUIColor
-        let step = trayCellSize + 2.0
+        let totalW = CGFloat(piece.width) * trayCellSize + CGFloat(piece.width - 1) * 2.0
+        let totalH = CGFloat(piece.height) * trayCellSize + CGFloat(piece.height - 1) * 2.0
 
         ZStack {
-            // Invisible hit box filling the entire slot
-            Color.clear
-                .contentShape(Rectangle())
+            // Card container background
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(gameState.activeTheme.boardBackground.swiftUIColor.opacity(0.45))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(gameState.activeTheme.gridLine.swiftUIColor, lineWidth: 1.2)
+                )
 
-            // Symmetrically centered piece tiles
-            ForEach(piece.coordinates, id: \.self) { coord in
-                let cellX = (CGFloat(coord.col) - CGFloat(piece.width - 1) / 2.0) * step
-                let cellY = (CGFloat(coord.row) - CGFloat(piece.height - 1) / 2.0) * step
-
-                RoundedRectangle(cornerRadius: max(3, trayCellSize * 0.22), style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [baseColor.opacity(0.85), baseColor],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: max(3, trayCellSize * 0.22), style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1.0)
-                    )
-                    .frame(width: trayCellSize, height: trayCellSize)
-                    .offset(x: cellX, y: cellY)
+            // Piece Grid - fully centered by ZStack layout
+            VStack(spacing: 2.0) {
+                ForEach(0..<piece.height, id: \.self) { r in
+                    HStack(spacing: 2.0) {
+                        ForEach(0..<piece.width, id: \.self) { c in
+                            if piece.coordinates.contains(Coordinate(row: r, col: c)) {
+                                RoundedRectangle(cornerRadius: max(2.5, trayCellSize * 0.22), style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [baseColor.opacity(0.85), baseColor],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: max(2.5, trayCellSize * 0.22), style: .continuous)
+                                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1.0)
+                                    )
+                                    .frame(width: trayCellSize, height: trayCellSize)
+                            } else {
+                                Color.clear
+                                    .frame(width: trayCellSize, height: trayCellSize)
+                            }
+                        }
+                    }
+                }
             }
+            .frame(width: totalW, height: totalH)
+            .opacity(isBeingDragged ? 0.2 : 1.0)
         }
         .frame(width: slotSize, height: slotSize)
-        .opacity(isBeingDragged ? 0.2 : 1.0)
+        .contentShape(Rectangle())
         .gesture(
-            DragGesture(coordinateSpace: .named("GameCoordinateSpace"))
+            DragGesture(coordinateSpace: .global)
                 .onChanged { value in
                     if gameState.activeDrag?.pieceIndex != index {
                         gameState.startDrag(index: index, piece: piece, location: value.location)

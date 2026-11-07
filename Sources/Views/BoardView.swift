@@ -54,7 +54,7 @@ public struct BoardView: View {
                         Color.clear.preference(
                             key: GridGeometryPreferenceKey.self,
                             value: GridGeometry(
-                                frame: gridGeo.frame(in: .named("GameCoordinateSpace")),
+                                frame: gridGeo.frame(in: .global),
                                 cellSize: cellSize
                             )
                         )

@@ -20,30 +20,13 @@ public struct GameView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Header (Score, Best, Theme Trigger)
-                ScoreHeaderView(gameState: gameState, showThemeSheet: $showThemeSheet)
-                    .padding(.top, 8)
+            SafeAreaContent(
+                gameState: gameState,
+                gridGeometry: $gridGeometry,
+                showThemeSheet: $showThemeSheet
+            )
 
-                Spacer()
-
-                // Center 8x8 Board
-                BoardView(gameState: gameState) { newGeometry in
-                    gridGeometry = newGeometry
-                }
-                .padding(.horizontal, 16)
-
-                Spacer()
-
-                // Bottom Piece Tray
-                TrayView(
-                    gameState: gameState,
-                    gridGeometry: gridGeometry
-                )
-                .padding(.bottom, 20)
-            }
-
-            // Root-Level Dragging Piece Overlay (Always on top of entire screen!)
+            // Root-Level Dragging Piece Overlay
             if let drag = gameState.activeDrag {
                 FloatingPieceView(
                     piece: drag.piece,
@@ -59,9 +42,40 @@ public struct GameView: View {
                 GameOverOverlayView(gameState: gameState)
             }
         }
-        .coordinateSpace(name: "GameCoordinateSpace")
+        .ignoresSafeArea()
         .sheet(isPresented: $showThemeSheet) {
             ThemeSelectionSheet(gameState: gameState)
+        }
+    }
+}
+
+private struct SafeAreaContent: View {
+    @ObservedObject var gameState: GameState
+    @Binding var gridGeometry: GridGeometry
+    @Binding var showThemeSheet: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header (Score, Best, Theme Trigger)
+            ScoreHeaderView(gameState: gameState, showThemeSheet: $showThemeSheet)
+                .padding(.top, 44) // Accommodate safe area / status bar
+
+            Spacer()
+
+            // Center 8x8 Board
+            BoardView(gameState: gameState) { newGeometry in
+                gridGeometry = newGeometry
+            }
+            .padding(.horizontal, 16)
+
+            Spacer()
+
+            // Bottom Piece Tray
+            TrayView(
+                gameState: gameState,
+                gridGeometry: gridGeometry
+            )
+            .padding(.bottom, 24)
         }
     }
 }
